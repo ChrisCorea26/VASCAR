@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VASCAR">
+<meta name="theme-color" content="#0b0f14">
+<title>VASCAR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one fixed-height instrument screen — controls on top, readout in the middle, two large switches at thumb height. */
+:root {
+  --bg: #e9edf1;
+  --panel: #ffffff;
+  --fg: #10161d;
+  --muted: #5a6572;
+  --line: #d3d9e0;
+  --time: #1d8048;
+  --dist: #1d5bb8;
+  --stop: #c42b26;
+  --warn: #a76300;
+  --ok: #1d8048;
+  --on-switch: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --body: "Barlow", -apple-system, "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0f14; --panel: #151b23; --fg: #e8edf2; --muted: #8a96a3; --line: #27313c;
+    --time: #2aa860; --dist: #3b7be0; --stop: #e0443a; --warn: #e3a332; --ok: #3cc073;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0f14; --panel: #151b23; --fg: #e8edf2; --muted: #8a96a3; --line: #27313c;
+  --time: #2aa860; --dist: #3b7be0; --stop: #e0443a; --warn: #e3a332; --ok: #3cc073;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.4 var(--body);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--dist); outline-offset: 2px; }
+
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: 12px;
+  padding-block: calc(env(safe-area-inset-top, 0px) + 12px) calc(env(safe-area-inset-bottom, 0px) + 12px);
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Top bar */
+.bar { display: flex; align-items: center; gap: 10px; }
+.brand {
+  font: 700 22px/1 var(--display);
+  letter-spacing: 0.08em;
+}
+.seg {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+  min-width: 0;
+}
+.seg button {
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  padding: 8px 6px;
+  font: 600 15px/1 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.seg[aria-disabled="true"] { opacity: 0.5; }
+.icon-btn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: 600 14px/1 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* GPS strip */
+.gps {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  min-height: 38px;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--stop); flex: none; }
+.dot.ok { background: var(--ok); }
+.dot.fair { background: var(--warn); }
+.gps .msg { flex: 1; min-width: 0; }
+.gps .live { font: 600 15px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* Readout */
+.readout {
+  display: flex; flex-direction: column; justify-content: center; gap: 12px;
+  min-height: 0;
+}
+.speed { text-align: center; }
+.speed .num {
+  font: 700 clamp(84px, 30vw, 168px)/0.9 var(--display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.speed .unit {
+  font: 600 16px/1 var(--display);
+  letter-spacing: 0.24em;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: center;
+  min-width: 0;
+}
+.tile.active { border-color: var(--stop); box-shadow: inset 0 0 0 2px var(--stop); }
+.tile .lbl {
+  font: 600 12px/1 var(--display);
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.tile .val {
+  font: 600 32px/1.15 var(--display);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hint { text-align: center; color: var(--muted); font-size: 14px; min-height: 2.8em; text-wrap: balance; margin: 0; }
+.warnline { color: var(--warn); font-size: 13px; text-align: center; font-weight: 600; margin: 0; }
+
+/* Stationary distance */
+.zone {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.zone label { flex: 1; font-weight: 500; }
+.zone input {
+  width: 7.5em;
+  text-align: right;
+  font: 600 24px/1.2 var(--display);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 4px 8px;
+}
+.zone .u { font: 600 16px/1 var(--display); color: var(--muted); }
+
+/* Switches */
+.switches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  height: clamp(150px, 30dvh, 260px);
+}
+.switches.single { grid-template-columns: 1fr; }
+.sw {
+  border: 0;
+  border-radius: 20px;
+  color: var(--on-switch);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 60ms ease, filter 60ms ease;
+}
+.sw .name { font: 700 30px/1 var(--display); letter-spacing: 0.1em; }
+.sw .state { font: 600 16px/1 var(--display); letter-spacing: 0.2em; opacity: 0.9; }
+.sw.time { background: var(--time); }
+.sw.dist { background: var(--dist); }
+.sw.running { background: var(--stop); }
+.sw.flash { transform: scale(0.97); filter: brightness(0.85); }
+.sw:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Log sheet */
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--fg);
+  padding: 0;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+}
+dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.sheet { display: flex; flex-direction: column; max-height: calc(100dvh - 50px); }
+.sheet header, .sheet footer {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 16px;
+}
+.sheet header { border-bottom: 1px solid var(--line); }
+.sheet header h2 { flex: 1; margin: 0; font: 700 22px/1 var(--display); letter-spacing: 0.06em; }
+.sheet footer { border-top: 1px solid var(--line); }
+.sheet footer .spacer { flex: 1; }
+.list { overflow-y: auto; padding: 4px 16px; min-height: 120px; }
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; }
+.row .mph { font: 700 24px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.row .mph .flag { color: var(--warn); font-size: 15px; letter-spacing: 0.04em; margin-left: 6px; }
+.row .meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.row .mode { font: 600 12px/1 var(--display); letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; align-self: center; }
+.row .del { grid-column: 2; grid-row: 2 / span 2; align-self: center; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--muted); }
+.empty { color: var(--muted); text-align: center; padding: 32px 0; }
+.btn {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+}
+.btn.danger { color: var(--stop); }
+.btn.danger.armed { background: var(--stop); color: var(--on-switch); border-color: var(--stop); }
+.csvbox { width: 100%; height: 140px; margin: 0 16px 12px; width: calc(100% - 32px); font: 12px/1.4 ui-monospace, Menlo, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+
+@media (prefers-reduced-motion: reduce) { .sw { transition: none; } }
+@media (max-height: 640px) { .speed .num { font-size: clamp(64px, 20vw, 120px); } .hint { min-height: 0; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <span class="brand">VASCAR</span>
+    <div class="seg" id="seg" role="group" aria-label="Mode">
+      <button type="button" id="mode-moving" data-mode="moving" aria-pressed="true">Moving</button>
+      <button type="button" id="mode-stationary" data-mode="stationary" aria-pressed="false">Stationary</button>
+    </div>
+    <button type="button" class="icon-btn" id="reset-btn">Reset</button>
+    <button type="button" class="icon-btn" id="log-btn">Log</button>
+  </div>
+
+  <div class="gps" id="gps" aria-live="polite">
+    <span class="dot" id="gps-dot"></span>
+    <span class="msg" id="gps-msg">Starting GPS…</span>
+    <span class="live" id="gps-live"></span>
+  </div>
+
+  <div class="readout">
+    <div class="speed">
+      <div class="num" id="speed">--</div>
+      <div class="unit">MPH</div>
+    </div>
+    <div class="tiles">
+      <div class="tile" id="time-tile"><div class="lbl">TIME</div><div class="val" id="time-val">0.00 s</div></div>
+      <div class="tile" id="dist-tile"><div class="lbl">DISTANCE</div><div class="val" id="dist-val">0 ft</div></div>
+    </div>
+    <p class="warnline" id="warn" hidden>GPS signal was weak or interrupted. Verify this reading.</p>
+    <p class="hint" id="hint"></p>
+  </div>
+
+  <div class="zone" id="zone" hidden>
+    <label for="zone-ft">Measured distance</label>
+    <input id="zone-ft" type="text" inputmode="decimal" autocomplete="off" value="500">
+    <span class="u">FT</span>
+  </div>
+
+  <div class="switches" id="switches">
+    <button type="button" class="sw dist" id="dist-btn" aria-label="Distance switch">
+      <span class="name">DISTANCE</span><span class="state" id="dist-state">START</span>
+    </button>
+    <button type="button" class="sw time" id="time-btn" aria-label="Time switch">
+      <span class="name">TIME</span><span class="state" id="time-state">START</span>
+    </button>
+  </div>
+</div>
+
+<dialog id="log">
+  <div class="sheet">
+    <header>
+      <h2>Log</h2>
+      <button type="button" class="btn" id="log-close">Done</button>
+    </header>
+    <div class="list" id="log-list"></div>
+    <textarea class="csvbox" id="csv-box" readonly hidden aria-label="Log as CSV"></textarea>
+    <footer>
+      <button type="button" class="btn" id="share-btn">Share CSV</button>
+      <button type="button" class="btn" id="copy-btn">Copy CSV</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn danger" id="clear-btn">Clear all</button>
+    </footer>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- constants ----------
+  const FT_PER_M = 3.280839895;
+  const MAX_ACC_M = 20;          // reject fixes worse than ±20 m
+  const MIN_SPEED = 0.45;        // m/s (~1 mph); below this we're stopped
+  const MAX_GAP_S = 3;           // longer gap between fixes = dropout
+  const MAX_EXTRAP_S = 2;        // live readout may extrapolate this far
+  const RESOLVE_TIMEOUT_MS = 3000; // wait this long for the fix after a press
+
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+
+  // ---------- GPS odometer ----------
+  // Each accepted fix stores the cumulative distance travelled up to that fix,
+  // built by integrating Doppler speed (trapezoid rule) between fixes.
+  const gps = { fixes: [], watch: null, acc: null, error: null };
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371008.8, r = Math.PI / 180;
+    const dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  function startGPS() {
+    if (gps.watch != null) return;
+    if (!window.isSecureContext) { gps.error = "insecure"; return; }
+    if (!("geolocation" in navigator)) { gps.error = "unsupported"; return; }
+    gps.watch = navigator.geolocation.watchPosition(onPos, onErr,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  }
+  function stopGPS() {
+    if (gps.watch != null) navigator.geolocation.clearWatch(gps.watch);
+    gps.watch = null;
+  }
+  function onErr(e) {
+    gps.error = e.code === 1 ? "denied" : e.code === 3 ? "timeout" : "unavailable";
+  }
+
+  function onPos(p) {
+    const c = p.coords, t = p.timestamp;
+    gps.acc = c.accuracy;
+    gps.error = null;
+    if (!(c.accuracy >= 0 && c.accuracy <= MAX_ACC_M)) return;
+
+    const prev = gps.fixes[gps.fixes.length - 1];
+    let v = (typeof c.speed === "number" && isFinite(c.speed) && c.speed >= 0) ? c.speed : null;
+    let D = 0, kind = "first";
+    if (prev) {
+      const dt = (t - prev.t) / 1000;
+      if (dt <= 0) return;
+      const step = haversine(prev.lat, prev.lon, c.latitude, c.longitude);
+      if (v == null) v = step / dt;
+      if (dt <= MAX_GAP_S) {
+        const avg = (prev.v + v) / 2;
+        D = prev.D + (avg >= MIN_SPEED ? avg * dt : 0);
+        kind = "trap";
+      } else {
+        D = prev.D + step; // dropout: straight line, flagged
+        kind = "gap";
+      }
+    } else if (v == null) {
+      v = 0;
+    }
+    gps.fixes.push({ t, D, v, lat: c.latitude, lon: c.longitude, acc: c.accuracy, kind });
+    if (gps.fixes.length > 900) gps.fixes.splice(0, gps.fixes.length - 900);
+    resolveMarks();
+  }
+
+  const lastFix = () => gps.fixes[gps.fixes.length - 1];
+  function hasFix() {
+    const f = lastFix();
+    return !!f && Date.now() - f.t < MAX_GAP_S * 1000;
+  }
+
+  // Live estimate at wall time t (extrapolates past the last fix).
+  function odometerLive(t) {
+    const f = lastFix();
+    if (!f) return 0;
+    const dt = Math.min(Math.max((t - f.t) / 1000, 0), MAX_EXTRAP_S);
+    return f.D + (f.v >= MIN_SPEED ? f.v : 0) * dt;
+  }
+
+  // Exact reading at time t, interpolated between the fixes before and after t.
+  // Returns null until a fix after t has arrived.
+  function bracketAt(t) {
+    const fx = gps.fixes;
+    for (let i = 1; i < fx.length; i++) {
+      if (fx[i].t > t) {
+        const a = fx[i - 1], b = fx[i];
+        if (a.t > t) return { D: fx[0].D, lat: fx[0].lat, lon: fx[0].lon, after: b.t };
+        const span = (b.t - a.t) / 1000, tau = (t - a.t) / 1000, f = tau / span;
+        let D;
+        if (b.kind === "trap" && b.D > a.D) {
+          // Speed assumed to change linearly across the interval.
+          D = a.D + a.v * tau + (b.v - a.v) * tau * tau / (2 * span);
+        } else {
+          D = a.D + (b.D - a.D) * f;
+        }
+        return { D, lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f, after: b.t };
+      }
+    }
+    return null;
+  }
+
+  // ---------- session ----------
+  const S = {
+    mode: store.get("mode", "moving") === "stationary" ? "stationary" : "moving",
+    zoneFt: Number(store.get("zoneFt", 500)) || 500,
+    tStart: null, tElapsed: 0, tDone: false,
+    dStart: null, dEnd: null, dRunning: false,
+    weakStart: false, hidden: false,
+    result: null,
+    log: Array.isArray(store.get("log", [])) ? store.get("log", []) : []
+  };
+
+  const makeMark = (t) => ({ t, prov: odometerLive(t), D: null, lat: null, lon: null, after: null, fallback: false });
+
+  function resolveMark(m) {
+    if (!m || m.D != null) return;
+    const r = bracketAt(m.t);
+    if (r) {
+      Object.assign(m, r);
+    } else if (Date.now() - m.t > RESOLVE_TIMEOUT_MS) {
+      const f = lastFix();
+      m.D = m.prov; m.fallback = true;
+      if (f) { m.lat = f.lat; m.lon = f.lon; m.after = f.t; }
+    }
+  }
+  function resolveMarks() {
+    resolveMark(S.dStart);
+    if (S.dEnd) resolveMark(S.dEnd);
+    evaluate();
+  }
+
+  const timeRunning = () => S.tStart != null;
+  const anyRunning = () => timeRunning() || S.dRunning;
+
+  function resetRun() {
+    S.tStart = null; S.tElapsed = 0; S.tDone = false;
+    S.dStart = null; S.dEnd = null; S.dRunning = false;
+    S.weakStart = false; S.hidden = false; S.result = null;
+  }
+
+  function toggleTime() {
+    const now = performance.now();
+    if (timeRunning()) {
+      S.tElapsed = (now - S.tStart) / 1000;
+      S.tStart = null; S.tDone = true;
+      evaluate();
+    } else {
+      if (S.result) resetRun();
+      S.tElapsed = 0; S.tDone = false; S.tStart = now;
+    }
+  }
+
+  function toggleDistance() {
+    const now = Date.now();
+    if (S.dRunning) {
+      S.dEnd = makeMark(now);
+      S.dRunning = false;
+      resolveMarks();
+    } else {
+      if (!hasFix()) return;
+      if (S.result) resetRun();
+      S.dStart = makeMark(now); S.dEnd = null; S.dRunning = true;
+      S.weakStart = !hasFix(); S.hidden = false;
+      resolveMarks();
+    }
+  }
+
+  function distancePending() {
+    return S.mode === "moving" && S.dEnd && (S.dStart.D == null || S.dEnd.D == null);
+  }
+
+  function evaluate() {
+    if (S.result || !S.tDone || !(S.tElapsed > 0)) return;
+    let ft, warn = false, s = null, e = null;
+    if (S.mode === "stationary") {
+      ft = S.zoneFt;
+    } else {
+      if (!S.dEnd || S.dStart.D == null || S.dEnd.D == null) return;
+      s = S.dStart; e = S.dEnd;
+      ft = (e.D - s.D) * FT_PER_M;
+      const gap = gps.fixes.some(f => f.kind === "gap" && f.t > s.t && f.t <= (e.after || e.t));
+      warn = S.weakStart || S.hidden || s.fallback || e.fallback || gap;
+    }
+    if (!(ft > 0)) return;
+    const mph = ft / S.tElapsed * 3600 / 5280;
+    S.result = {
+      date: new Date().toISOString(), mode: S.mode,
+      ft, s: S.tElapsed, mph, warn,
+      a: s && s.lat != null ? [s.lat, s.lon] : null,
+      b: e && e.lat != null ? [e.lat, e.lon] : null
+    };
+    S.log.unshift(S.result);
+    store.set("log", S.log);
+    renderLog();
+  }
+
+  // ---------- UI ----------
+  const el = {
+    seg: $("seg"), zone: $("zone"), zoneFt: $("zone-ft"), switches: $("switches"),
+    distBtn: $("dist-btn"), timeBtn: $("time-btn"), distState: $("dist-state"), timeState: $("time-state"),
+    speed: $("speed"), timeVal: $("time-val"), distVal: $("dist-val"),
+    timeTile: $("time-tile"), distTile: $("dist-tile"), warn: $("warn"), hint: $("hint"),
+    gps: $("gps"), gpsDot: $("gps-dot"), gpsMsg: $("gps-msg"), gpsLive: $("gps-live")
+  };
+
+  function setMode(m) {
+    if (anyRunning()) return;
+    S.mode = m; store.set("mode", m);
+    resetRun();
+    for (const b of el.seg.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
+    el.zone.hidden = m !== "stationary";
+    el.gps.hidden = m !== "moving";
+    el.distBtn.hidden = m !== "moving";
+    el.switches.classList.toggle("single", m !== "moving");
+    if (m === "moving") startGPS(); else stopGPS();
+  }
+
+  function fmtFt(v) { return Math.round(Math.max(v, 0)).toLocaleString("en-US") + " ft"; }
+
+  function liveFeet() {
+    if (S.mode === "stationary") return { v: S.zoneFt, pending: false };
+    if (S.dRunning && S.dStart) return { v: (odometerLive(Date.now()) - (S.dStart.D ?? S.dStart.prov)) * FT_PER_M, pending: false };
+    if (S.dEnd) {
+      const a = S.dStart.D ?? S.dStart.prov, b = S.dEnd.D ?? S.dEnd.prov;
+      return { v: (b - a) * FT_PER_M, pending: S.dStart.D == null || S.dEnd.D == null };
+    }
+    return { v: 0, pending: false };
+  }
+
+  function hintText() {
+    if (S.result) return "Press either switch to start a new measurement.";
+    if (distancePending()) return "Finalizing distance from the next GPS fix…";
+    if (S.mode === "stationary") {
+      if (timeRunning()) return "Press TIME as the target leaves the zone.";
+      return "Press TIME as the target enters the measured zone.";
+    }
+    if (timeRunning() || S.dRunning) {
+      const left = [timeRunning() && "TIME", S.dRunning && "DISTANCE"].filter(Boolean).join(" and ");
+      return "Press " + left + " again at the second landmark.";
+    }
+    if (S.tDone || S.dEnd) return "Waiting for the other switch to finish.";
+    return "Press TIME as the target passes the first landmark, and DISTANCE as your vehicle passes it.";
+  }
+
+  function renderGPS() {
+    if (S.mode !== "moving") return;
+    let cls = "", msg, live = "";
+    if (gps.error === "insecure") msg = "GPS needs the page opened over https://";
+    else if (gps.error === "unsupported") msg = "This browser has no location support";
+    else if (gps.error === "denied") msg = "Location blocked. Allow it in Settings › Privacy & Security › Location Services › Safari Websites.";
+    else if (hasFix()) {
+      const ft = gps.acc * FT_PER_M;
+      cls = ft <= 16 ? "ok" : "fair";
+      msg = "GPS ±" + Math.round(ft) + " ft";
+      live = Math.round(lastFix().v * 2.236936) + " mph";
+    } else if (gps.acc != null && gps.acc > MAX_ACC_M) {
+      msg = "Weak GPS (±" + Math.round(gps.acc * FT_PER_M) + " ft). Waiting for a better fix…";
+    } else {
+      msg = "Acquiring GPS…";
+    }
+    el.gpsDot.className = "dot" + (cls ? " " + cls : "");
+    el.gpsMsg.textContent = msg;
+    el.gpsLive.textContent = live;
+  }
+
+  function render() {
+    const tr = timeRunning();
+    const secs = tr ? (performance.now() - S.tStart) / 1000 : S.tElapsed;
+    el.timeVal.textContent = secs.toFixed(2) + " s";
+    const lf = liveFeet();
+    el.distVal.textContent = fmtFt(lf.v) + (lf.pending ? "…" : "");
+    el.timeTile.classList.toggle("active", tr);
+    el.distTile.classList.toggle("active", S.dRunning);
+
+    el.speed.textContent = S.result ? S.result.mph.toFixed(1) : "--";
+    el.warn.hidden = !(S.result && S.result.warn);
+
+    el.timeBtn.classList.toggle("running", tr);
+    el.timeState.textContent = tr ? "STOP" : "START";
+    el.distBtn.classList.toggle("running", S.dRunning);
+    el.distState.textContent = S.dRunning ? "STOP" : "START";
+    el.distBtn.disabled = !S.dRunning && !hasFix();
+
+    el.seg.setAttribute("aria-disabled", String(anyRunning()));
+    el.zoneFt.disabled = anyRunning();
+    el.hint.textContent = hintText();
+    renderGPS();
+    requestAnimationFrame(render);
+  }
+
+  // Switches fire on touch-down so the timestamp matches the finger hitting the glass.
+  function bindSwitch(btn, action) {
+    btn.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || btn.disabled) return;
+      e.preventDefault();
+      action();
+      btn.classList.add("flash");
+      setTimeout(() => btn.classList.remove("flash"), 90);
+      keepAwake();
+    });
+    btn.addEventListener("click", (e) => { if (e.detail === 0 && !btn.disabled) action(); }); // keyboard
+    btn.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
+  bindSwitch(el.timeBtn, toggleTime);
+  bindSwitch(el.distBtn, toggleDistance);
+
+  el.seg.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-mode]");
+    if (b) setMode(b.dataset.mode);
+  });
+  $("reset-btn").addEventListener("click", resetRun);
+
+  el.zoneFt.value = String(S.zoneFt);
+  el.zoneFt.addEventListener("input", () => {
+    const v = parseFloat(el.zoneFt.value.replace(/,/g, ""));
+    if (v > 0) { S.zoneFt = v; store.set("zoneFt", v); }
+  });
+  el.zoneFt.addEventListener("keydown", (e) => { if (e.key === "Enter") el.zoneFt.blur(); });
+
+  // ---------- log ----------
+  const dlg = $("log"), list = $("log-list"), csvBox = $("csv-box"), clearBtn = $("clear-btn");
+
+  function renderLog() {
+    list.textContent = "";
+    if (!S.log.length) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "No measurements yet. Each completed reading is saved here on this device.";
+      list.append(p);
+      return;
+    }
+    S.log.forEach((m, i) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const mph = document.createElement("div");
+      mph.className = "mph";
+      mph.textContent = m.mph.toFixed(1) + " mph";
+      if (m.warn) { const f = document.createElement("span"); f.className = "flag"; f.textContent = "⚠ GPS"; mph.append(f); }
+      const mode = document.createElement("div");
+      mode.className = "mode";
+      mode.textContent = m.mode;
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = Math.round(m.ft).toLocaleString("en-US") + " ft in " + m.s.toFixed(2) + " s · " +
+        new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "del"; del.textContent = "Delete";
+      del.addEventListener("click", () => { S.log.splice(i, 1); store.set("log", S.log); renderLog(); });
+      row.append(mph, mode, meta, del);
+      list.append(row);
+    });
+  }
+
+  function toCSV() {
+    const head = "date,mode,distance_ft,time_s,speed_mph,gps_warning,start_lat,start_lon,end_lat,end_lon";
+    const rows = S.log.map(m => [
+      m.date, m.mode, m.ft.toFixed(1), m.s.toFixed(3), m.mph.toFixed(2), m.warn ? "yes" : "no",
+      m.a ? m.a[0].toFixed(7) : "", m.a ? m.a[1].toFixed(7) : "",
+      m.b ? m.b[0].toFixed(7) : "", m.b ? m.b[1].toFixed(7) : ""
+    ].join(","));
+    return [head, ...rows].join("\n");
+  }
+
+  function showCSV() {
+    csvBox.hidden = false;
+    csvBox.value = toCSV();
+    csvBox.focus(); csvBox.select();
+  }
+  async function copyCSV() {
+    try { await navigator.clipboard.writeText(toCSV()); flashLabel($("copy-btn"), "Copied"); }
+    catch { showCSV(); }
+  }
+  async function shareCSV() {
+    const csv = toCSV();
+    try {
+      const file = new File([csv], "vascar-log.csv", { type: "text/csv" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "VASCAR log" }); return; }
+      if (navigator.share) { await navigator.share({ title: "VASCAR log", text: csv }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    showCSV();
+  }
+  function flashLabel(btn, text) {
+    const old = btn.textContent; btn.textContent = text;
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  }
+
+  let clearArmed = null;
+  clearBtn.addEventListener("click", () => {
+    if (!S.log.length) return;
+    if (clearArmed) {
+      clearTimeout(clearArmed); clearArmed = null;
+      S.log = []; store.set("log", S.log); renderLog();
+      clearBtn.classList.remove("armed"); clearBtn.textContent = "Clear all";
+      return;
+    }
+    clearBtn.classList.add("armed"); clearBtn.textContent = "Tap again to clear";
+    clearArmed = setTimeout(() => { clearArmed = null; clearBtn.classList.remove("armed"); clearBtn.textContent = "Clear all"; }, 3000);
+  });
+
+  $("log-btn").addEventListener("click", () => { renderLog(); csvBox.hidden = true; dlg.showModal(); });
+  $("log-close").addEventListener("click", () => dlg.close());
+  $("share-btn").addEventListener("click", shareCSV);
+  $("copy-btn").addEventListener("click", copyCSV);
+
+  // ---------- keep the screen on ----------
+  let wakeLock = null;
+  async function keepAwake() {
+    if (wakeLock || !("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    } catch { wakeLock = null; }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") keepAwake();
+    else if (S.dRunning || distancePending()) S.hidden = true; // GPS pauses in the background
+  });
+  document.addEventListener("pointerdown", keepAwake, { once: true });
+
+  // ---------- start ----------
+  setInterval(resolveMarks, 200);
+  setMode(S.mode);
+  keepAwake();
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
